@@ -1,0 +1,87 @@
+name: Owner Private CI
+
+on:
+  pull_request_target:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: owner-private-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  OWNER_GITHUB_USER_ID: "5168752"
+
+jobs:
+  authorize-owner:
+    name: Authorize owner private CI
+    environment: owner-private-ci
+    if: >-
+      vars.OWNER_PRIVATE_CI_ENABLED == 'true' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.id == 5168752 &&
+      github.actor_id == '5168752' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify immutable owner and same-repository head
+        env:
+          ACTOR_ID: ${{ github.actor_id }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_AUTHOR_ID: ${{ github.event.pull_request.user.id }}
+        run: |
+          set -euo pipefail
+          test "${ACTOR_ID}" = "${OWNER_GITHUB_USER_ID}"
+          test "${PR_AUTHOR_ID}" = "${OWNER_GITHUB_USER_ID}"
+          test "${HEAD_REPOSITORY}" = "${GITHUB_REPOSITORY}"
+
+  test:
+    name: Test (Java ${{ matrix.java }})
+    needs: authorize-owner
+    runs-on: [self-hosted, Linux, X64, public-overflow]
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        java: [17, 21]
+    steps:
+      - name: Verify trusted PR identity
+        env:
+          ACTOR_ID: ${{ github.actor_id }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_AUTHOR_ID: ${{ github.event.pull_request.user.id }}
+        run: |
+          set -euo pipefail
+          test "${ACTOR_ID}" = "${OWNER_GITHUB_USER_ID}"
+          test "${PR_AUTHOR_ID}" = "${OWNER_GITHUB_USER_ID}"
+          test "${HEAD_REPOSITORY}" = "${GITHUB_REPOSITORY}"
+      - name: Check out exact trusted PR revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Set up Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - name: Test, package, and enforce coverage
+        run: mvn -B -ntp clean verify
+
+  ci-success:
+    name: CI Success
+    needs: test
+    runs-on: [self-hosted, Linux, X64, public-overflow]
+    timeout-minutes: 5
+    steps:
+      - name: Verify private test matrix
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: test "${TEST_RESULT}" = "success"
