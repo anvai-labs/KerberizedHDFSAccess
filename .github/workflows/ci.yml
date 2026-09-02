@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Java ${{ matrix.java }})
+    if: >-
+      github.event_name != 'pull_request' ||
+      vars.OWNER_PRIVATE_CI_ENABLED != 'true' ||
+      github.actor_id != '5168752' ||
+      github.event.pull_request.user.id != 5168752 ||
+      github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [17, 21]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - name: Test, package, and enforce coverage
+        run: mvn -B -ntp clean verify
+      - name: Upload coverage report
+        if: matrix.java == 17
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: jacoco-report
+          path: KerberizedHDFSClient/target/site/jacoco/
+          if-no-files-found: error
+
+  dependency-review:
+    name: Dependency review
+    if: >-
+      github.event_name == 'pull_request' &&
+      (vars.OWNER_PRIVATE_CI_ENABLED != 'true' ||
+      github.actor_id != '5168752' ||
+      github.event.pull_request.user.id != 5168752 ||
+      github.event.pull_request.head.repo.full_name != github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: moderate
+
+  ci-success:
+    name: CI Success
+    if: >-
+      always() &&
+      (github.event_name != 'pull_request' ||
+      vars.OWNER_PRIVATE_CI_ENABLED != 'true' ||
+      github.actor_id != '5168752' ||
+      github.event.pull_request.user.id != 5168752 ||
+      github.event.pull_request.head.repo.full_name != github.repository)
+    needs: [test, dependency-review]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          set -euo pipefail
+          test "${TEST_RESULT}" = "success"
+          test "${DEPENDENCY_REVIEW_RESULT}" = "success" || \
+            test "${DEPENDENCY_REVIEW_RESULT}" = "skipped"
