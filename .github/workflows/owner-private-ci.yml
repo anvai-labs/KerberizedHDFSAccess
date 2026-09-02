@@ -73,7 +73,7 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: maven
       - name: Test, package, and enforce coverage
-        run: mvn -B -ntp clean verify
+        run: ./mvnw -B -ntp clean verify
 
   ci-success:
     name: CI Success
