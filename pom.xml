@@ -12,16 +12,41 @@
 
     <modules>
         <module>KerberizedHDFSClient</module>
+        <module>KnoxWebHDFSClient</module>
     </modules>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <hadoop.version>3.5.0</hadoop.version>
-        <junit.version>5.11.4</junit.version>
-        <jacoco.version>0.8.12</jacoco.version>
-        <maven.compiler.version>3.13.0</maven.compiler.version>
-        <maven.surefire.version>3.5.2</maven.surefire.version>
+        <junit.version>6.1.0</junit.version>
+        <mockito.version>5.23.0</mockito.version>
+        <jacoco.version>0.8.15</jacoco.version>
+        <maven.compiler.version>3.15.0</maven.compiler.version>
+        <maven.surefire.version>3.5.5</maven.surefire.version>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>apache-upstream</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <hadoop.version>3.5.0</hadoop.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>cdp-7.3.2-sp1</id>
+            <properties>
+                <hadoop.version>3.4.2.7.3.2.10000-317</hadoop.version>
+            </properties>
+            <repositories>
+                <repository>
+                    <id>cloudera</id>
+                    <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
 </project>

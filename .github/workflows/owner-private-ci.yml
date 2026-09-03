@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: owner-private-ci-${{ github.event.pull_request.number }}
@@ -40,7 +41,7 @@ jobs:
           test "${HEAD_REPOSITORY}" = "${GITHUB_REPOSITORY}"
 
   test:
-    name: Test (Java ${{ matrix.java }})
+    name: Test (${{ matrix.profile }}, Java ${{ matrix.java }})
     needs: authorize-owner
     runs-on: [self-hosted, Linux, X64, public-overflow]
     timeout-minutes: 20
@@ -48,7 +49,13 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        java: [17, 21]
+        include:
+          - profile: apache-upstream
+            java: 17
+          - profile: apache-upstream
+            java: 21
+          - profile: cdp-7.3.2-sp1
+            java: 17
     steps:
       - name: Verify trusted PR identity
         env:
@@ -73,15 +80,29 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: maven
       - name: Test, package, and enforce coverage
-        run: ./mvnw -B -ntp clean verify
+        run: ./mvnw -B -ntp -P${{ matrix.profile }} clean verify
+
+  dependency-review:
+    name: Dependency review
+    needs: authorize-owner
+    runs-on: [self-hosted, Linux, X64, public-overflow]
+    timeout-minutes: 10
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: moderate
 
   ci-success:
     name: CI Success
-    needs: test
+    needs: [test, dependency-review]
     runs-on: [self-hosted, Linux, X64, public-overflow]
     timeout-minutes: 5
     steps:
       - name: Verify private test matrix
         env:
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
           TEST_RESULT: ${{ needs.test.result }}
-        run: test "${TEST_RESULT}" = "success"
+        run: |
+          test "${TEST_RESULT}" = "success"
+          test "${DEPENDENCY_REVIEW_RESULT}" = "success"
