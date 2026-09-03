@@ -25,11 +25,6 @@ class KnoxWebHDFSClientTest {
       URI.create("https://gateway.example.com:8443/gateway/cdp-proxy");
 
   @Test
-  void ownerPrivateCiNegativeProof() {
-    assertTrue(false, "deliberate fail-closed routing proof");
-  }
-
-  @Test
   void rejectsMissingCommandLineArgumentsBeforeReadingCredentials() {
     assertThrows(IllegalArgumentException.class, () -> KnoxWebHDFSClient.main(null));
     assertThrows(
