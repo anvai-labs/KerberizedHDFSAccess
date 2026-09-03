@@ -95,7 +95,8 @@ jobs:
 
   ci-success:
     name: CI Success
-    needs: [test, dependency-review]
+    if: always() && needs.authorize-owner.result == 'success'
+    needs: [authorize-owner, test, dependency-review]
     runs-on: [self-hosted, Linux, X64, public-overflow]
     timeout-minutes: 5
     steps:
