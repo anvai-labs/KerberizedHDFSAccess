@@ -10,9 +10,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Test (Java ${{ matrix.java }})
+    name: Test (${{ matrix.profile }}, Java ${{ matrix.java }})
     if: >-
       github.event_name != 'pull_request' ||
       vars.OWNER_PRIVATE_CI_ENABLED != 'true' ||
@@ -23,7 +27,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [17, 21]
+        include:
+          - profile: apache-upstream
+            java: 17
+          - profile: apache-upstream
+            java: 21
+          - profile: cdp-7.3.2-sp1
+            java: 17
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -36,13 +46,13 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: maven
       - name: Test, package, and enforce coverage
-        run: ./mvnw -B -ntp clean verify
+        run: ./mvnw -B -ntp -P${{ matrix.profile }} clean verify
       - name: Upload coverage report
         if: matrix.java == 17
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: jacoco-report
-          path: KerberizedHDFSClient/target/site/jacoco/
+          name: jacoco-${{ matrix.profile }}-java-${{ matrix.java }}
+          path: '*/target/site/jacoco/'
           if-no-files-found: error
 
   dependency-review:
