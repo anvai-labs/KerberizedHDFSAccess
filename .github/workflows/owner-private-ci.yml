@@ -95,14 +95,20 @@ jobs:
           persist-credentials: false
           clean: true
       - name: Check documentation links
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
-        with:
-          args: >-
-            --root-dir . --max-retries 3 --timeout 30
+        env:
+          LYCHEE_ARCHIVE_SHA256: 73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/lychee-x86_64-unknown-linux-musl.tar.gz"
+          install_dir="${RUNNER_TEMP}/lychee-v0.24.2"
+          curl --fail --location --retry 3 --output "${archive}" \
+            https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2/lychee-x86_64-unknown-linux-musl.tar.gz
+          printf '%s  %s\n' "${LYCHEE_ARCHIVE_SHA256}" "${archive}" | sha256sum --check --strict
+          rm -rf "${install_dir}"
+          mkdir -p "${install_dir}"
+          tar -xzf "${archive}" --strip-components=1 -C "${install_dir}"
+          "${install_dir}/lychee" --no-progress --root-dir . --max-retries 3 --timeout 30 \
             './**/*.md' './**/*.adoc'
-          fail: true
-          failIfEmpty: false
-          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
